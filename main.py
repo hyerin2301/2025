@@ -71,4 +71,47 @@ mbti_data = {
 }
 
 # --- 페이지 설정 ---
-st.se
+st.set_page_config(page_title="MBTI 직업 추천", page_icon="💡", layout="centered")
+
+# --- 앱 타이틀 ---
+st.markdown(
+    """
+    <h1 style="text-align:center; color:#ff6600;">
+        💡 MBTI 기반 직업 추천 앱
+    </h1>
+    <p style="text-align:center;">당신의 MBTI를 선택하면, 어울리는 직업과 멋진 GIF & 이미지를 보여드립니다!</p>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- MBTI 선택 ---
+mbti = st.selectbox("MBTI를 선택하세요", list(mbti_data.keys()))
+
+# --- 결과 표시 ---
+if mbti:
+    theme = mbti_data[mbti]
+
+    # MBTI 타이틀
+    st.markdown(
+        f"<h2 style='color:{theme['color']}'>{theme['emoji']} {mbti} 추천 직업</h2>",
+        unsafe_allow_html=True
+    )
+
+    # GIF 표시
+    st.image(theme["gif"], width=300)
+
+    # 직업 리스트
+    st.markdown(f"<h3 style='color:{theme['color']}'>추천 직업</h3>", unsafe_allow_html=True)
+    for job in theme["jobs"]:
+        st.write(f"- {job}")
+
+    # 이미지 여러 장 표시
+    st.markdown(f"<h3 style='color:{theme['color']}'>관련 이미지</h3>", unsafe_allow_html=True)
+    cols = st.columns(len(theme["images"]))
+    for idx, img_url in enumerate(theme["images"]):
+        with cols[idx]:
+            st.image(img_url, use_column_width=True)
+
+    # 구분선 + 안내
+    st.markdown("---")
+    st.caption("💡 이 추천은 참고용이며, 실제 진로 결정은 다양한 요소를 고려해야 합니다.")
