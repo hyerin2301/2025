@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime, date, time, timedelta
+from zoneinfo import ZoneInfo  # Python 3.9+
 
 # -----------------------------
 # 기본 설정
@@ -7,7 +8,7 @@ from datetime import datetime, date, time, timedelta
 st.set_page_config(page_title="개운하게 기상 ⏰ 취침 시간 계산기", page_icon="😴", layout="centered")
 
 # -----------------------------
-# 배경 & 테마 (달+구름 있는 배경 이미지)
+# 배경 & 테마 (달+구름 있는 밤하늘 이미지)
 # -----------------------------
 st.markdown(
     """
@@ -91,6 +92,24 @@ st.markdown(
 )
 
 # -----------------------------
+# 한국(서울) 현재 시간 기준 앵커 날짜 설정
+# -----------------------------
+KST = ZoneInfo("Asia/Seoul")
+now = datetime.now(tz=KST)
+
+def anchor_wake_date(now_dt: datetime) -> date:
+    if now_dt.hour >= 12:
+        return (now_dt + timedelta(days=1)).date()
+    return now_dt.date()
+
+anchor_date = anchor_wake_date(now)
+
+# 요일 한글
+WEEKDAY_KO = ["월", "화", "수", "목", "금", "토", "일"]
+def fmt_kor_date(d: date) -> str:
+    return f"{d.month}월 {d.day}일({WEEKDAY_KO[d.weekday()]})"
+
+# -----------------------------
 # 헤더
 # -----------------------------
 st.markdown("<div class='title'>🌙 개운하게 일어나려면 언제 자야 할까? ⏰</div>", unsafe_allow_html=True)
@@ -108,19 +127,26 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown(
+    f"🗓️ <b>기준 날짜:</b> <code>{fmt_kor_date(anchor_date)}</code> 오전 기상 기준으로 계산합니다.",
+    unsafe_allow_html=True
+)
+
+st.markdown("---")
+
 # -----------------------------
 # 입력 영역
 # -----------------------------
-st.markdown("### 💡 입력")
-col1, col2, col3 = st.columns([1,1,1])
-with col1:
-    wake_date = st.date_input("📅 기상 날짜 선택", date.today())
-with col2:
-    wake_time_only = st.time_input("⏰ 기상 시각 (5분 단위)", value=time(7, 0), step=300)
-with col3:
-    fall_asleep_min = st.slider("잠드는 데 걸리는 시간(분)", 0, 60, 15, step=5)
-
-cycle_min = st.slider("수면 주기 길이(분)", 80, 100, 90, step=1)
+with st.container():
+    st.markdown("### 💡 입력")
+    col1, col2, col3 = st.columns([1,1,1])
+    with col1:
+        wake_time_only = st.time_input("기상 시각 (5분 단위)", value=time(7, 0), step=300)
+    with col2:
+        fall_asleep_min = st.slider("잠드는 데 걸리는 시간(분)", 0, 60, 15, step=5)
+    with col3:
+        cycle_min = st.slider("수면 주기 길이(분)", 80, 100, 90, step=1)
+    st.caption("🔁 권장 계산 주기: 3~6주기 (일반적으로 4~5주기가 무난합니다).")
 
 # -----------------------------
 # 계산 함수
@@ -135,28 +161,23 @@ def compute_bedtimes(wake_date: date, wake_t: time, fall_min: int, cycle_len: in
     results.sort(key=lambda x: x[1], reverse=True)
     return results
 
-results = compute_bedtimes(wake_date, wake_time_only, fall_asleep_min, cycle_min)
+results = compute_bedtimes(anchor_date, wake_time_only, fall_asleep_min, cycle_min)
 
 # -----------------------------
-# 출력
+# 출력 영역
 # -----------------------------
 st.markdown("### 🎯 권장 취침 시각")
 cards = st.columns(len(results))
-
 emoji_gifs = [
     "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif",
     "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
     "https://media.giphy.com/media/26tPplGWjN0xLybiU/giphy.gif",
     "https://media.giphy.com/media/3oz8xKaR836UJOYeOc/giphy.gif",
 ]
-
-WEEKDAY_KO = ["월", "화", "수", "목", "금", "토", "일"]
-
 for idx, (n, bt) in enumerate(results):
     label_date = f"{bt.month}월 {bt.day}일({WEEKDAY_KO[bt.weekday()]})"
     label_time = bt.strftime("%H:%M")
-    wake_label = datetime.combine(wake_date, wake_time_only).strftime("%H:%M")
-
+    wake_label = datetime.combine(anchor_date, wake_time_only).strftime("%H:%M")
     with cards[idx]:
         st.markdown(
             f"""
@@ -168,20 +189,36 @@ for idx, (n, bt) in enumerate(results):
                 <hr style="border:none; border-top:1px solid rgba(255,255,255,0.2); margin:10px 0;">
                 <div>⏱️ 입면: 약 {fall_asleep_min}분</div>
                 <div>🔁 주기: {cycle_min}분 × {n}</div>
-                <div>⏰ 기상: {label_date} {wake_label}</div>
+                <div>⏰ 기상: {fmt_kor_date(anchor_date)} {wake_label}</div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
+# -----------------------------
+# 베스트 추천
+# -----------------------------
 best = sorted(results, key=lambda x: abs(x[0]-5))[0]
 best_time = best[1].strftime("%H:%M")
 st.markdown(
     f"""
     <div class="tip" style="margin-top:10px;">
-        ✅ 추천: 일반적으로 4~5주기 (약 6~7.5시간 수면)이 무난합니다.  
-        현재 설정에서는 {best[0]}주기 기준 {best[1].strftime("%m/%d")} {best_time} 취침이 좋아요!
+        ✅ <b>추천</b>: 일반적으로 <b>4~5주기</b> (약 6~7.5시간 수면)이 무난합니다.  
+        현재 설정에서는 <b>{best[0]}주기</b> 기준 <b>{fmt_kor_date(best[1].date())} {best_time}</b> 취침이 좋아요!
     </div>
     """,
     unsafe_allow_html=True
 )
+
+# -----------------------------
+# 안내 & 팁
+# -----------------------------
+st.markdown("### 📝 사용 팁")
+st.markdown(
+    """
+    - 스트레스/카페인 섭취 시 입면 시간이 길어질 수 있어요 → 슬라이더로 조정하세요.  
+    - 수면 주기는 개인차가 있으니 85~95분 범위에서 조정하며 컨디션을 확인하세요.  
+    - 주말에도 기상 시각을 크게 바꾸지 않으면 월요일 컨디션 유지에 도움이 됩니다 🌞
+    """
+)
+st.caption("⚠️ 본 도구는 참고용이며, 개인별 차이가 존재합니다.")
